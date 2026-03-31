@@ -1,0 +1,185 @@
+/* ── Google Drive Modal ── */
+#gdrive-modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); z-index: 9000;
+  align-items: center; justify-content: center;
+}
+#gdrive-modal-overlay.open { display: flex; }
+
+#gdrive-modal {
+  background: #1e1e1e; border: 1px solid #404040;
+  border-radius: 8px; width: 600px; max-width: 96vw;
+  height: 520px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+}
+
+#gdrive-modal-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid #404040;
+  flex-shrink: 0;
+}
+#gdrive-modal-title {
+  font-size: 13px; font-weight: 600; color: #e8e8e8;
+  display: flex; align-items: center; gap: 8px; flex: 1;
+}
+#gdrive-modal-close {
+  background: none; border: none; color: #9d9d9d;
+  font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+}
+#gdrive-modal-close:hover { color: #fff; }
+
+/* Breadcrumb bar */
+#gdrive-breadcrumb {
+  display: flex; align-items: center;
+  padding: 7px 14px; background: #252526;
+  border-bottom: 1px solid #333; flex-shrink: 0;
+  font-size: 11.5px; flex-wrap: wrap; gap: 2px;
+}
+.gdrive-crumb { color: #007acc; cursor: pointer; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+.gdrive-crumb:hover { background: #2a2d2e; text-decoration: underline; }
+.gdrive-crumb.current { color: #ccc; cursor: default; font-weight: 500; }
+.gdrive-crumb.current:hover { background: transparent; text-decoration: none; }
+.gdrive-crumb-sep { color: #555; padding: 0 2px; }
+
+/* Toolbar row */
+#gdrive-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-bottom: 1px solid #2d2d2d;
+  flex-shrink: 0; background: #1e1e1e;
+}
+#gdrive-search-input {
+  flex: 1; background: #2d2d2d; border: 1px solid #404040;
+  border-radius: 4px; color: #ccc; font-size: 12px;
+  padding: 5px 10px; outline: none;
+}
+#gdrive-search-input:focus { border-color: #007acc; }
+.gdrive-tb-btn {
+  padding: 4px 10px; background: #2d2d2d; border: 1px solid #404040;
+  border-radius: 3px; color: #ccc; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.gdrive-tb-btn:hover { background: #37373d; color: #fff; }
+.gdrive-tb-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* File list */
+#gdrive-file-list { flex: 1; overflow-y: auto; min-height: 0; }
+#gdrive-file-list::-webkit-scrollbar { width: 6px; }
+#gdrive-file-list::-webkit-scrollbar-track { background: #1e1e1e; }
+#gdrive-file-list::-webkit-scrollbar-thumb { background: #404040; border-radius: 3px; }
+
+.gdrive-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 16px; cursor: pointer; font-size: 12px;
+  color: #ccc; transition: background 0.08s; user-select: none;
+  border-bottom: 1px solid #252526;
+}
+.gdrive-item:hover { background: #2a2d2e; }
+.gdrive-item.selected { background: #1a3a5c; border-left: 2px solid #007acc; padding-left: 14px; }
+.gdrive-item.folder-item .gi-name { color: #9cdcfe; }
+.gdrive-item .gi-icon { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; }
+.gdrive-item .gi-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gdrive-item .gi-meta { font-size: 10.5px; color: #555; white-space: nowrap; flex-shrink: 0; }
+.gdrive-item .gi-badge {
+  font-size: 9px; padding: 1px 5px; border-radius: 8px;
+  background: #1b3a5c; color: #9cdcfe; font-weight: 600; flex-shrink: 0;
+}
+.gdrive-omni-folder .gi-name { color: #4ec9b0 !important; }
+.gdrive-omni-folder .gi-badge { background: #1a3a2a; color: #4ec9b0; }
+
+/* Status + footer */
+#gdrive-status-bar {
+  padding: 5px 16px; font-size: 11px; color: #555;
+  border-top: 1px solid #2d2d2d; min-height: 24px;
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+}
+#gdrive-modal-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 10px 16px; border-top: 1px solid #404040; flex-shrink: 0;
+}
+#gdrive-footer-left { font-size: 11px; color: #6a6a6a; }
+#gdrive-footer-right { display: flex; gap: 8px; }
+
+/* ── Save modal ── */
+#save-modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); z-index: 9100;
+  align-items: center; justify-content: center;
+}
+#save-modal-overlay.open { display: flex; }
+#save-modal {
+  background: #252526; border: 1px solid #404040;
+  border-radius: 8px; padding: 22px; width: 380px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+}
+#save-modal h3 { font-size: 14px; font-weight: 600; color: #e8e8e8; margin-bottom: 6px; }
+#save-modal p  { font-size: 12px; color: #9d9d9d; margin-bottom: 14px; }
+#save-modal label { font-size: 11px; color: #9d9d9d; display: block; margin-bottom: 4px; }
+#save-filename-input {
+  width: 100%; background: #2d2d2d; border: 1px solid #404040;
+  border-radius: 4px; color: #ccc; font-size: 12px; padding: 6px 10px;
+  margin-bottom: 8px; outline: none; font-family: var(--font-mono);
+}
+#save-filename-input:focus { border-color: #007acc; }
+#save-folder-display {
+  font-size: 11px; color: #4ec9b0; background: #1a3a2a;
+  border: 1px solid #2a5a3a; border-radius: 4px; padding: 5px 10px;
+  margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+}
+.save-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Open Source Modal ── */
+#open-source-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); z-index: 8900;
+  align-items: center; justify-content: center;
+}
+#open-source-modal.open { display: flex; }
+#open-source-box {
+  background: #252526; border: 1px solid #404040;
+  border-radius: 8px; padding: 22px; width: 340px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+#open-source-box h3 {
+  font-size: 14px; font-weight: 600; color: #e8e8e8;
+  margin-bottom: 16px; text-align: center;
+}
+.open-source-btn {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 16px; margin-bottom: 10px; background: #2d2d2d;
+  border: 1px solid #404040; border-radius: 6px; color: #ccc;
+  font-size: 13px; cursor: pointer; text-align: left;
+  transition: background 0.12s, border-color 0.12s;
+}
+.open-source-btn:hover { background: #37373d; border-color: #007acc; color: #fff; }
+.open-source-btn .osb-icon { font-size: 22px; flex-shrink: 0; }
+.open-source-btn .osb-label { font-weight: 600; }
+.open-source-btn .osb-desc { font-size: 11px; color: #6a6a6a; margin-top: 2px; }
+#open-source-cancel {
+  width: 100%; margin-top: 4px; padding: 7px;
+  background: transparent; border: 1px solid #404040;
+  border-radius: 4px; color: #6a6a6a; font-size: 12px; cursor: pointer;
+}
+#open-source-cancel:hover { color: #ccc; border-color: #666; }
+
+/* ── New File Modal ── */
+#new-file-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); z-index: 8900;
+  align-items: center; justify-content: center;
+}
+#new-file-modal.open { display: flex; }
+#new-file-box {
+  background: #252526; border: 1px solid #404040;
+  border-radius: 8px; padding: 24px; width: 360px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+#new-file-box h3 { font-size: 14px; font-weight: 600; color: #e8e8e8; margin-bottom: 8px; }
+#new-file-box p  { font-size: 12px; color: #9d9d9d; margin-bottom: 18px; }
+#new-file-box input {
+  width: 100%; background: #2d2d2d; border: 1px solid #404040;
+  border-radius: 4px; color: #ccc; font-size: 12px; padding: 6px 10px;
+  margin-bottom: 14px; outline: none; font-family: var(--font-mono);
+}
+#new-file-box input:focus { border-color: #007acc; }
+.new-file-actions { display: flex; gap: 8px; justify-content: flex-end; }

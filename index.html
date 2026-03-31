@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omniforma Editor — Arduino C++</title>
+
+<!-- External dependencies -->
+<script src="https://unpkg.com/blockly/blockly.min.js"></script>
+<script src="https://github.com/dbuezas/arduino-web-uploader/releases/download/v1.1.2/main.js"></script>
+
+<!-- Monaco Editor CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
+
+<!-- Omniforma CSS (load order matters) -->
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/simulator.css">
+<link rel="stylesheet" href="css/editor.css">
+<link rel="stylesheet" href="css/modal.css">
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div id="topbar">
+  <h1>
+    <span class="title-logo">⬡</span>
+    Omniforma Editor
+    <span style="font-size:11px;color:#9cdcfe;background:#1b3a5c;padding:2px 8px;border-radius:3px;font-weight:400;letter-spacing:0.2px;">Arduino C++</span>
+    <span style="font-size:10px;color:#6a6a6a;font-weight:400;">— by 3 idiots</span>
+  </h1>
+  <div class="sep"></div>
+  <!-- File operations -->
+  <button class="btn btn-gray" onclick="newFile()" title="New File (Ctrl+N)">&#43; New</button>
+  <button class="btn btn-gray" onclick="openFileChooser()" title="Open File (Ctrl+O)">&#128194; Open</button>
+  <button class="btn btn-blue" onclick="saveFile()" title="Save (Ctrl+S)" id="btn-save">&#128190; Save</button>
+  <!-- Filename + unsaved indicator -->
+  <span id="current-filename">untitled.ino</span>
+  <span id="unsaved-dot" title="Unsaved changes"></span>
+  <div class="sep"></div>
+  <button class="btn btn-orange" onclick="downloadINO()">&#8595; .ino</button>
+  <button class="btn btn-gray"   onclick="downloadHex()">&#8595; .hex</button>
+  <div class="sep"></div>
+  <button class="btn btn-red"    onclick="clearAll()">&#9249; Clear</button>
+  <div class="sep"></div>
+  <input id="render-url" placeholder="Render server URL" style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:5px;padding:4px 8px;font-size:11px;width:210px;"/>
+  <button class="btn btn-green" onclick="doCloudCompile()">&#9729; Compile &amp; Upload</button>
+  <button id="uploadBtn" arduino-uploader hex-href="" board="uno" class="btn btn-blue" style="display:none;">&#9651; Upload [<span class="upload-progress"></span>]</button>
+  <div class="sep"></div>
+  <!-- Google account -->
+  <div id="google-user-chip" onclick="gdriveSignOut()" title="Click to sign out">
+    <img id="google-user-avatar" src="" alt=""/>
+    <span id="google-user-name">Signed in</span>
+  </div>
+  <button id="btn-google-signin" class="btn-google" onclick="gdriveSignIn()" title="Sign in with Google to save/open files on Drive">
+    <svg width="14" height="14" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+    Sign in with Google
+  </button>
+</div>
+
+<div id="board-bar">
+  <label>Board:</label>
+  <select id="board-select" onchange="selectBoard(this.value)">
+    <option value="uno">Arduino Uno (ATmega328P)</option>
+    <option value="mega">Arduino Mega 2560</option>
+    <option value="nano">Arduino Nano</option>
+    <option value="esp32">ESP32 DevKit</option>
+    <option value="rp2040">Raspberry Pi Pico (RP2040)</option>
+    <option value="leonado">Arduino Leonardo</option>
+  </select>
+  <span id="board-info">14 digital · 6 analog · 6 PWM · 32KB flash</span>
+</div>
+<div id="main">
+  <div id="left-pane">
+    <div id="mode-bar">
+      <div class="mode-btn active" id="btn-blocks" onclick="setMode('blocks')">&#9632; Blocks</div>
+      <div class="mode-btn"        id="btn-text"   onclick="setMode('text')">&#9998; Arduino C++ Editor</div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:4px;padding:0 8px;">
+        <button id="btn-toggle-output"
+          onclick="toggleViewPanel()"
+          title="Hide/show Arduino C++ &amp; HEX output panel"
+          style="background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
+                 color:var(--text-muted);font-size:11px;padding:2px 8px;cursor:pointer;
+                 transition:all 0.12s;white-space:nowrap;"
+          onmouseover="this.style.color='var(--text-primary)';this.style.borderColor='#666'"
+          onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
+          &#9664; Hide Output
+        </button>
+        <button id="btn-toggle-sim"
+          onclick="toggleSimPanel()"
+          title="Hide/show Simulator panel"
+          style="background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
+                 color:var(--text-muted);font-size:11px;padding:2px 8px;cursor:pointer;
+                 transition:all 0.12s;white-space:nowrap;"
+          onmouseover="this.style.color='var(--text-primary)';this.style.borderColor='#666'"
+          onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">
+          &#9654; Hide Sim
+        </button>
+        <button id="btn-toggle-real-serial"
+          onclick="rsmToggle()"
+          title="Toggle Real Serial Monitor (Web Serial API)">
+          &#128220; Serial Monitor
+        </button>
+      </div>
+    </div>
+    <div id="blockly-div"></div>
+    <div id="text-editor-pane">
+      <!-- top toolbar -->
+      <div id="editor-top-toolbar">
+        <button class="ed-btn ed-btn-run"  onclick="editorCompileAndRun()" title="Compile & run (Ctrl+Enter)">&#9654; Run</button>
+        <button class="ed-btn ed-btn-fmt"  onclick="editorFormat()"        title="Auto-format / indent">&#9638; Format</button>
+        <button class="ed-btn ed-btn-cmt"  onclick="editorToggleComment()" title="Toggle comment (Ctrl+/)">// Comment</button>
+        <button class="ed-btn ed-btn-undo" onclick="document.execCommand('undo')" title="Undo">&#8630;</button>
+        <button class="ed-btn ed-btn-undo" onclick="document.execCommand('redo')" title="Redo">&#8631;</button>
+        <span class="sep"></span>
+        <button class="ed-btn ed-btn-snippet" onclick="editorInsertSnippet('setup')" title="Insert setup()">setup()</button>
+        <button class="ed-btn ed-btn-snippet" onclick="editorInsertSnippet('loop')"  title="Insert loop()">loop()</button>
+        <button class="ed-btn ed-btn-snippet" onclick="cppInsert('dw')"   title="Insert digitalWrite">dwrite</button>
+        <button class="ed-btn ed-btn-snippet" onclick="cppInsert('dr')"   title="Insert digitalRead">dread</button>
+        <button class="ed-btn ed-btn-snippet" onclick="cppInsert('ser')"  title="Insert Serial.println">serial</button>
+        <button class="ed-btn ed-btn-snippet" onclick="cppInsert('for')"  title="Insert for loop">for</button>
+        <button class="ed-btn ed-btn-snippet" onclick="cppInsert('if')"   title="Insert if">if</button>
+        <button class="ed-btn ed-btn-snippet" onclick="cppInsert('var')"  title="Insert variable">var</button>
+        <span id="editor-lang-badge">Arduino C++</span>
+      </div>
+      <!-- error bar -->
+      <div id="editor-error-bar"></div>
+      <!-- Monaco Editor container -->
+      <div id="editor-area">
+        <div id="monaco-container" style="flex:1;overflow:hidden;"></div>
+        <!-- hidden textarea kept for legacy code that reads mcu-editor.value -->
+        <textarea id="mcu-editor" style="display:none;" spellcheck="false"></textarea>
+      </div>
+      <div id="editor-toolbar">
+        <span id="cursor-pos">Ln 1, Col 1</span>
+        <span>Tab=4sp</span>
+        <span>Ctrl+Enter=Run</span>
+        <span>Ctrl+/=Comment</span>
+        <span id="compile-status-badge" class="csb-idle">Not compiled</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODE SWITCH WARNING MODAL ── -->
+  <div id="mode-modal-overlay" onclick="modalCancel(event)">
+    <div id="mode-modal">
+      <div id="mode-modal-header">
+        <span class="modal-icon">⚠️</span>
+        <h2 id="modal-title">Switch Editor Mode?</h2>
+      </div>
+      <div id="mode-modal-body">
+        <p id="modal-desc"></p>
+        <div class="modal-note" id="modal-note"></div>
+        <p>Do you want to continue?</p>
+      </div>
+      <div id="mode-modal-footer">
+        <button class="modal-btn modal-btn-cancel" onclick="modalCancel()">Cancel</button>
+        <button class="modal-btn modal-btn-confirm" id="modal-confirm-btn" onclick="modalConfirm()">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- resize handle between left-pane and output panel -->
+  <div class="resize-handle" id="resize-panel" title="Drag to resize"></div>
+
+  <div id="panel">
+    <div class="panel-header-row">
+      <div class="panel-tab-bar">
+        <div class="panel-tab active" onclick="showTab('cpp')">Arduino C++</div>
+        <div class="panel-tab"       onclick="showTab('hex')">HEX</div>
+      </div>
+      <button class="panel-toggle-btn" id="view-toggle-btn" title="Toggle View panel" onclick="toggleViewPanel()">&#10094;</button>
+    </div>
+    <!-- collapsed stub (vertical) -->
+    <div class="panel-stub" onclick="toggleViewPanel()">
+      <span class="panel-stub-icon">&#128196;</span>
+      <span class="panel-stub-label">OUTPUT VIEW</span>
+    </div>
+    <!-- collapsed stub (horizontal, mobile) -->
+    <div class="panel-stub-horiz" onclick="toggleViewPanel()">
+      <span>&#128196; OUTPUT VIEW</span>
+    </div>
+    <div id="tab-cpp" class="panel-body active"><div id="out-cpp" class="code-out">&#8592; Build blocks or write code, then Compile</div></div>
+    <div id="tab-hex" class="panel-body"><div id="out-hex" class="code-out">← Compile to see real HEX from GitHub Actions</div></div>
+    <!-- compile error bar — shown on error, hidden on success -->
+    <div id="panel-error-bar">
+      <div class="err-title">
+        <span>&#9888; Compile Error</span>
+        <button class="err-close" onclick="hidePanelError()" title="Dismiss">&#10005;</button>
+      </div>
+      <div class="err-body" id="panel-error-msg"></div>
+    </div>
+  </div>
+
+  <!-- resize handle between panel and sim -->
+  <div class="resize-handle" id="resize-sim" title="Drag to resize"></div>
+
+  <!-- ── LIVE SIMULATOR PANEL ── -->
+  <div id="sim-panel">
+    <!-- collapsed stub (vertical) -->
+    <div class="sim-stub" onclick="toggleSimPanel()">
+      <span class="sim-stub-icon">&#9654;</span>
+      <span class="sim-stub-label">SIMULATOR</span>
+    </div>
+    <!-- collapsed stub (horizontal, mobile) -->
+    <div class="sim-stub-horiz" onclick="toggleSimPanel()">
+      <span>&#9654; SIMULATOR</span>
+    </div>
+    <div id="sim-header">
+      <div id="sim-tab-bar" style="display:flex;flex:1;overflow:hidden;">
+        <div class="sim-tab active" id="sim-tab-btn-sim" onclick="showSimTab('sim')">Simulator</div>
+        <div class="sim-tab" id="sim-tab-btn-comp" onclick="showSimTab('comp')">Components</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding:0 8px;flex-shrink:0;">
+        <button class="sim-run-btn" id="btn-sim-run" onclick="simToggle()">&#9654; Run</button>
+        <button class="sim-run-btn" id="btn-sim-stop" onclick="simReset()">&#9646;&#9646; Reset</button>
+        <div id="sim-speed"><select id="speed-select" onchange="simSetSpeed(this.value)">
+          <option value="1000">1x</option>
+          <option value="500">2x</option>
+          <option value="200">5x</option>
+          <option value="50">20x</option>
+        </select></div>
+        <button class="sim-toggle-btn" id="sim-toggle-btn" title="Toggle Simulator panel" onclick="toggleSimPanel()">&#10095;</button>
+      </div>
+    </div>
+    <div id="sim-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+    <div id="sim-tab-sim" style="flex:1;overflow-y:auto;padding:12px;display:block;">
+
+      <!-- board SVG visual -->
+      <div class="sim-section">
+        <div class="sim-section-title">Board</div>
+        <div id="board-svg-wrap"></div>
+      </div>
+
+      <!-- digital pin table -->
+      <div class="sim-section">
+        <div class="sim-section-title">Digital Pins</div>
+        <div id="pin-table"></div>
+      </div>
+
+      <!-- analog inputs -->
+      <div class="sim-section">
+        <div class="sim-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Analog Inputs</span>
+          <span style="display:flex;gap:4px;align-items:center;">
+            <label style="font-size:9px;color:#8b949e;cursor:pointer;">
+              <input type="checkbox" id="analog-wave-en" style="margin:0;" onchange="analogWaveToggle(this.checked)"> Wave
+            </label>
+            <select id="analog-wave-type" style="background:#0d1117;color:#f0883e;border:1px solid #30363d;border-radius:3px;font-size:9px;padding:1px 3px;" onchange="analogWaveSetType(this.value)">
+              <option value="sine">Sine</option>
+              <option value="triangle">Triangle</option>
+              <option value="square">Square</option>
+              <option value="sawtooth">Sawtooth</option>
+              <option value="noise">Noise</option>
+            </select>
+          </span>
+        </div>
+        <div id="analog-table"></div>
+      </div>
+
+      <!-- sim clock -->
+      <div class="sim-section">
+        <div class="sim-section-title">Execution</div>
+        <div id="sim-clock">Stopped — click Run to simulate</div>
+      </div>
+
+      <!-- serial monitor -->
+      <div class="sim-section">
+        <div class="sim-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Serial Monitor</span>
+          <span id="serial-baud-label" style="font-size:9px;color:#3fb950;font-family:monospace;">9600 baud</span>
+        </div>
+        <!-- toolbar -->
+        <div id="serial-toolbar" style="display:flex;gap:4px;margin-bottom:4px;align-items:center;flex-wrap:wrap;">
+          <select id="serial-baud-sel" style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;font-size:9px;padding:2px 4px;" onchange="serialSetBaud(this.value)">
+            <option value="300">300</option>
+            <option value="1200">1200</option>
+            <option value="2400">2400</option>
+            <option value="4800">4800</option>
+            <option value="9600" selected>9600</option>
+            <option value="19200">19200</option>
+            <option value="38400">38400</option>
+            <option value="57600">57600</option>
+            <option value="115200">115200</option>
+          </select>
+          <select id="serial-line-end" style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:3px;font-size:9px;padding:2px 4px;">
+            <option value="none">No line ending</option>
+            <option value="nl" selected>Newline</option>
+            <option value="cr">Carriage return</option>
+            <option value="both">Both NL+CR</option>
+          </select>
+          <label style="font-size:9px;color:#8b949e;display:flex;align-items:center;gap:2px;cursor:pointer;">
+            <input type="checkbox" id="serial-timestamp" style="margin:0;" onchange="serialToggleTimestamp(this.checked)"> TS
+          </label>
+          <label style="font-size:9px;color:#8b949e;display:flex;align-items:center;gap:2px;cursor:pointer;">
+            <input type="checkbox" id="serial-autoscroll" checked style="margin:0;"> Auto
+          </label>
+          <button class="btn-serial-send" style="background:#a32d2d;font-size:9px;padding:2px 6px;margin-left:auto;" onclick="serialClear()">Clr</button>
+          <button class="btn-serial-send" style="background:#1a3a5c;font-size:9px;padding:2px 6px;" onclick="serialExport()">&#8595;</button>
+        </div>
+        <div id="serial-monitor"></div>
+        <!-- RX bytes indicator -->
+        <div style="display:flex;justify-content:space-between;margin:2px 0 4px;font-size:9px;color:#444;font-family:monospace;">
+          <span>RX: <span id="serial-rx-count" style="color:#3fb950;">0</span> bytes</span>
+          <span>TX: <span id="serial-tx-count" style="color:#79c0ff;">0</span> bytes</span>
+        </div>
+        <div id="serial-input-row">
+          <input id="serial-input" placeholder="Send to MCU (Enter to send)..." onkeydown="if(event.key==='Enter')serialSend()"/>
+          <button class="btn-serial-send" onclick="serialSend()">Send</button>
+        </div>
+        <!-- quick send presets -->
+        <div id="serial-presets" style="display:flex;gap:3px;margin-top:4px;flex-wrap:wrap;">
+          <span style="font-size:9px;color:#555;align-self:center;">Quick:</span>
+          <button class="btn-serial-send" style="font-size:8px;padding:1px 5px;background:#1a3a1a;" onclick="serialQuick('1')">1</button>
+          <button class="btn-serial-send" style="font-size:8px;padding:1px 5px;background:#1a3a1a;" onclick="serialQuick('0')">0</button>
+          <button class="btn-serial-send" style="font-size:8px;padding:1px 5px;background:#1a2a3a;" onclick="serialQuick('HIGH')">HIGH</button>
+          <button class="btn-serial-send" style="font-size:8px;padding:1px 5px;background:#1a2a3a;" onclick="serialQuick('LOW')">LOW</button>
+          <button class="btn-serial-send" style="font-size:8px;padding:1px 5px;background:#2a1a0a;" onclick="serialQuick('STATUS')">STATUS</button>
+          <button class="btn-serial-send" style="font-size:8px;padding:1px 5px;background:#2a1a2a;" onclick="serialQuick('RESET')">RESET</button>
+        </div>
+      </div>
+
+    </div><!-- end sim-tab-sim -->
+
+      <!-- Components tab content -->
+      <div id="sim-tab-comp" style="flex:1;overflow-y:auto;padding:10px 12px;display:none;">
+        <div id="comp-sim-body" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="comp-empty-msg" style="color:#555;font-size:11px;padding:16px 4px;">
+          No components detected. Use LCD, Servo, NeoPixel, etc. in your code and run the simulator.
+        </div>
+      </div>
+
+    </div><!-- end sim-body -->
+  </div><!-- end sim-panel -->
+
+</div><!-- end #main -->
+
+<!-- ── REAL SERIAL MONITOR (bottom overlay over output+sim panels) ── -->
+<div id="real-serial-monitor" class="rsm-hidden">
+  <!-- Resize handle at top -->
+  <div id="rsm-resize-handle" title="Drag to resize"></div>
+  <!-- Header -->
+  <div id="rsm-header">
+    <div class="rsm-title">
+      <div class="rsm-dot" id="rsm-dot"></div>
+      REAL SERIAL MONITOR
+      <span style="font-size:9px;color:#3a3a6a;font-weight:400;">(Web Serial API)</span>
+    </div>
+    <div id="rsm-controls">
+      <select id="rsm-baud-select" title="Baud rate">
+        <option value="300">300</option>
+        <option value="1200">1200</option>
+        <option value="2400">2400</option>
+        <option value="4800">4800</option>
+        <option value="9600" selected>9600</option>
+        <option value="19200">19200</option>
+        <option value="38400">38400</option>
+        <option value="57600">57600</option>
+        <option value="115200">115200</option>
+      </select>
+      <select id="rsm-line-end" class="rsm-line-end-sel" title="Line ending">
+        <option value="none">No ending</option>
+        <option value="nl" selected>Newline (\n)</option>
+        <option value="cr">CR (\r)</option>
+        <option value="both">NL+CR</option>
+      </select>
+      <button class="rsm-btn rsm-btn-connect" id="rsm-connect-btn" onclick="rsmConnect()">&#128279; Connect</button>
+      <button class="rsm-btn rsm-btn-clear" onclick="rsmClear()">&#128465; Clear</button>
+      <button class="rsm-btn" id="rsm-upload-btn" onclick="rsmUploadSketch()"
+        title="Upload compiled sketch to Arduino"
+        style="background:#16825d;color:#fff;border-color:#1f9b70;display:none;">&#9651; Upload Sketch</button>
+      <label id="rsm-autoscroll-label" title="Auto-scroll to latest output">
+        <input type="checkbox" id="rsm-autoscroll" checked style="margin:0;"> Auto
+      </label>
+      <span id="rsm-status-text">Not connected — click Connect to pick a port</span>
+    </div>
+    <button id="rsm-toggle-btn" onclick="rsmToggle()" title="Hide serial monitor">&#8964; Hide</button>
+  </div>
+  <!-- Output -->
+  <div id="rsm-output"><div class="rsm-line-sys"><span class="rsm-ts"></span>Ready. Connect a device via USB and click Connect.</div></div>
+  <!-- RX/TX bar -->
+  <div id="rsm-rx-tx-bar">
+    <span>RX: <span id="rsm-rx-count">0</span> bytes</span>
+    <span>TX: <span id="rsm-tx-count">0</span> bytes</span>
+    <span id="rsm-baud-disp" style="margin-left:auto;color:#333;">&#9679; 9600 baud</span>
+  </div>
+  <!-- Input row -->
+  <div id="rsm-input-row">
+    <input id="rsm-input" placeholder="Type message to send… (Enter to send)" disabled
+      onkeydown="if(event.key==='Enter') rsmSend()"/>
+    <button id="rsm-send-btn" onclick="rsmSend()" disabled>Send</button>
+  </div>
+</div>
+
+<div id="status">Ready</div>
+
+<!-- Toolbox -->
+<xml id="toolbox" style="display:none">
+
+  <!-- ══════════════════════════════════════════════════════
+       OMNIFORMA EDITOR TOOLBOX — by 3 idiots
+       ══════════════════════════════════════════════════════ -->
+
+  <!-- ── 1. PROGRAM ─────────────────────────────────────── -->
+  <category name="🏗 Program" colour="#185FA5">
+    <label text="— Entry points —"></label>
+    <block type="mcu_setup_block"></block>
+    <block type="mcu_forever"></block>
+    <sep gap="10"></sep>
+    <label text="— Functions —"></label>
+    <block type="mcu_func_def"></block>
+    <block type="mcu_func_call"></block>
+    <sep gap="10"></sep>
+    <label text="— Pin declaration —"></label>
+    <block type="mcu_pin_setup"></block>
+    <block type="mcu_pin_mode"></block>
+    <sep gap="10"></sep>
+    <label text="— Imports —"></label>
+    <block type="mcu_import"></block>
+  </category>
+
+  <!-- ── 2. FLOW CONTROL ────────────────────────────────── -->
+  <category name="🔀 Flow Control" colour="#607D8B">
+    <label text="— Conditionals —"></label>
+    <block type="mcu_if"></block>
+    <block type="mcu_if_else"></block>
+    <block type="mcu_if_elif_else"></block>
+    <sep gap="10"></sep>
+    <label text="— Loops —"></label>
+    <block type="mcu_repeat"></block>
+    <block type="mcu_for_range"></block>
+    <block type="mcu_while"></block>
+    <sep gap="10"></sep>
+    <label text="— Loop control —"></label>
+    <block type="mcu_break"></block>
+    <block type="mcu_continue"></block>
+    <block type="mcu_return"></block>
+  </category>
+
+  <!-- ── 3. VARIABLES & MATH ───────────────────────────── -->
+  <category name="📊 Variables & Math" colour="#d85a30">
+    <label text="— Variables —"></label>
+    <block type="mcu_set_var"></block>
+    <block type="mcu_change_var"></block>
+    <block type="mcu_varname"></block>
+    <sep gap="10"></sep>
+    <label text="— Math —"></label>
+    <block type="mcu_math_op"></block>
+    <block type="mcu_map"></block>
+    <block type="mcu_constrain"></block>
+    <sep gap="10"></sep>
+    <label text="— Comparison —"></label>
+    <block type="mcu_compare"></block>
+    <block type="mcu_logic_and"></block>
+    <block type="mcu_logic_or"></block>
+    <block type="mcu_logic_not"></block>
+    <sep gap="10"></sep>
+    <label text="— Values —"></label>
+    <block type="mcu_number"></block>
+    <block type="mcu_text"></block>
+  </category>
+
+  <!-- ── 4. TIMING ──────────────────────────────────────── -->
+  <category name="⏱ Timing" colour="#854F0B">
+    <label text="— Delays —"></label>
+    <block type="mcu_delay"></block>
+    <block type="mcu_delay_micros"></block>
+    <sep gap="10"></sep>
+    <label text="— Timer / millis —"></label>
+    <block type="mcu_millis"></block>
+  </category>
+
+  <!-- ── 5. DIGITAL I/O ─────────────────────────────────── -->
+  <category name="⚡ Digital I/O" colour="#3B6D11">
+    <label text="— Output —"></label>
+    <block type="mcu_digital_write"></block>
+    <block type="mcu_analog_write"></block>
+    <sep gap="10"></sep>
+    <label text="— Input —"></label>
+    <block type="mcu_digital_read"></block>
+    <block type="mcu_analog_read"></block>
+    <block type="mcu_pulse_in"></block>
+    <sep gap="10"></sep>
+    <label text="— Button / switch —"></label>
+    <block type="mcu_button_read"></block>
+    <block type="mcu_button_debounce"></block>
+    <sep gap="10"></sep>
+    <label text="— Relay —"></label>
+    <block type="mcu_relay_on"></block>
+    <block type="mcu_relay_off"></block>
+  </category>
+
+  <!-- ── 6. SERIAL / UART ───────────────────────────────── -->
+  <category name="📡 Serial" colour="#A32D2D">
+    <label text="— Setup —"></label>
+    <block type="mcu_serial_begin"></block>
+    <sep gap="10"></sep>
+    <label text="— Output —"></label>
+    <block type="mcu_serial_print"></block>
+    <block type="mcu_serial_println"></block>
+    <sep gap="10"></sep>
+    <label text="— Input —"></label>
+    <block type="mcu_serial_available"></block>
+    <block type="mcu_serial_read"></block>
+    <block type="mcu_serial_readstring"></block>
+  </category>
+
+  <!-- ── 7. SENSORS ─────────────────────────────────────── -->
+  <category name="🔭 Sensors" colour="#7B3F00">
+
+    <category name="🌡 DHT (Temp/Humidity)" colour="#712B13">
+      <label text="— Setup —"></label>
+      <block type="mcu_dht_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Read —"></label>
+      <block type="mcu_dht_temp"></block>
+      <block type="mcu_dht_humidity"></block>
+    </category>
+
+    <category name="📏 Ultrasonic (HC-SR04)" colour="#1a4a6e">
+      <label text="— Measure distance —"></label>
+      <block type="mcu_ultrasonic_init"></block>
+      <block type="mcu_ultrasonic_cm"></block>
+      <block type="mcu_ultrasonic_inch"></block>
+    </category>
+
+    <category name="🌡 DS18B20 (1-Wire Temp)" colour="#6a1f1f">
+      <label text="— Setup —"></label>
+      <block type="mcu_ds18b20_begin"></block>
+      <label text="— Read —"></label>
+      <block type="mcu_ds18b20_read"></block>
+    </category>
+
+    <category name="💡 IR Sensor / Remote" colour="#4a1a6a">
+      <label text="— Obstacle / line sensor —"></label>
+      <block type="mcu_ir_obstacle"></block>
+      <block type="mcu_ir_line"></block>
+      <sep gap="10"></sep>
+      <label text="— IR remote receiver —"></label>
+      <block type="mcu_ir_begin"></block>
+      <block type="mcu_ir_receive"></block>
+      <block type="mcu_ir_value"></block>
+    </category>
+
+    <category name="🏃 PIR Motion Sensor" colour="#2a4a1a">
+      <label text="— Motion detect —"></label>
+      <block type="mcu_pir_read"></block>
+    </category>
+
+    <category name="💧 Soil / Water Sensor" colour="#1a3a1a">
+      <label text="— Read moisture —"></label>
+      <block type="mcu_soil_read"></block>
+    </category>
+
+    <category name="🔊 Sound Sensor" colour="#3a1a3a">
+      <label text="— Read sound level —"></label>
+      <block type="mcu_sound_read"></block>
+    </category>
+
+    <category name="💡 LDR (Light Sensor)" colour="#4a4a1a">
+      <label text="— Read light level —"></label>
+      <block type="mcu_ldr_read"></block>
+    </category>
+
+  </category>
+
+  <!-- ── 8. DISPLAYS ────────────────────────────────────── -->
+  <category name="🖥 Displays" colour="#085041">
+
+    <category name="📺 LCD (I2C/Parallel)" colour="#085041">
+      <label text="— Setup —"></label>
+      <block type="mcu_lcd_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Display —"></label>
+      <block type="mcu_lcd_print"></block>
+      <block type="mcu_lcd_cursor"></block>
+      <block type="mcu_lcd_clear"></block>
+      <block type="mcu_lcd_backlight"></block>
+    </category>
+
+    <category name="🟦 OLED (SSD1306 I2C)" colour="#1a1a4a">
+      <label text="— Setup —"></label>
+      <block type="mcu_oled_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Text —"></label>
+      <block type="mcu_oled_print"></block>
+      <block type="mcu_oled_println"></block>
+      <block type="mcu_oled_set_cursor"></block>
+      <block type="mcu_oled_set_size"></block>
+      <sep gap="10"></sep>
+      <label text="— Drawing —"></label>
+      <block type="mcu_oled_draw_rect"></block>
+      <block type="mcu_oled_draw_circle"></block>
+      <block type="mcu_oled_draw_line"></block>
+      <sep gap="10"></sep>
+      <label text="— Control —"></label>
+      <block type="mcu_oled_clear"></block>
+      <block type="mcu_oled_display"></block>
+      <block type="mcu_oled_invert"></block>
+    </category>
+
+    <category name="🔲 7-Seg / LED Matrix" colour="#1a3a2a">
+      <label text="— 7-segment (TM1637) —"></label>
+      <block type="mcu_tm1637_begin"></block>
+      <block type="mcu_tm1637_show"></block>
+      <block type="mcu_tm1637_brightness"></block>
+    </category>
+
+  </category>
+
+  <!-- ── 9. ACTUATORS ───────────────────────────────────── -->
+  <category name="⚙ Actuators" colour="#4a1a4a">
+
+    <category name="🔧 Servo Motor" colour="#72243E">
+      <label text="— Setup —"></label>
+      <block type="mcu_servo_attach"></block>
+      <sep gap="10"></sep>
+      <label text="— Control —"></label>
+      <block type="mcu_servo_write"></block>
+      <block type="mcu_servo_read"></block>
+      <block type="mcu_servo_detach"></block>
+    </category>
+
+    <category name="🚗 Stepper Motor" colour="#2a1a4a">
+      <label text="— Setup —"></label>
+      <block type="mcu_stepper_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Control —"></label>
+      <block type="mcu_stepper_step"></block>
+      <block type="mcu_stepper_speed"></block>
+    </category>
+
+    <category name="🔔 Buzzer / Tone" colour="#412402">
+      <label text="— Tone —"></label>
+      <block type="mcu_tone"></block>
+      <block type="mcu_no_tone"></block>
+      <block type="mcu_beep"></block>
+    </category>
+
+  </category>
+
+  <!-- ── 10. LIGHTS & LEDs ──────────────────────────────── -->
+  <category name="💡 Lights" colour="#4a4a00">
+
+    <category name="🌈 NeoPixel / WS2812" colour="#1a1a6e">
+      <label text="— Setup —"></label>
+      <block type="mcu_neo_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Control —"></label>
+      <block type="mcu_neo_set_pixel"></block>
+      <block type="mcu_neo_fill"></block>
+      <block type="mcu_neo_brightness"></block>
+      <block type="mcu_neo_show"></block>
+      <block type="mcu_neo_clear"></block>
+    </category>
+
+    <category name="🎨 RGB LED" colour="#4a2a00">
+      <label text="— RGB output —"></label>
+      <block type="mcu_rgb_set"></block>
+      <block type="mcu_rgb_off"></block>
+    </category>
+
+  </category>
+
+  <!-- ── 11. COMMUNICATION ──────────────────────────────── -->
+  <category name="📶 Communication" colour="#1a3a5c">
+
+    <category name="🔗 I2C (Wire)" colour="#1a3a5c">
+      <label text="— Setup —"></label>
+      <block type="mcu_i2c_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Transfer —"></label>
+      <block type="mcu_i2c_begin_transmission"></block>
+      <block type="mcu_i2c_write"></block>
+      <block type="mcu_i2c_end_transmission"></block>
+      <block type="mcu_i2c_request"></block>
+      <block type="mcu_i2c_read"></block>
+    </category>
+
+    <category name="⚡ SPI" colour="#1a2a4a">
+      <label text="— Setup —"></label>
+      <block type="mcu_spi_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Transfer —"></label>
+      <block type="mcu_spi_transfer"></block>
+      <block type="mcu_spi_end"></block>
+    </category>
+
+    <category name="⌨ Keypad (4x4)" colour="#2a1a4a">
+      <label text="— Setup —"></label>
+      <block type="mcu_keypad_begin"></block>
+      <label text="— Read —"></label>
+      <block type="mcu_keypad_getkey"></block>
+    </category>
+
+    <category name="🕐 RTC (DS3231)" colour="#1a2a1a">
+      <label text="— Setup —"></label>
+      <block type="mcu_rtc_begin"></block>
+      <sep gap="10"></sep>
+      <label text="— Read —"></label>
+      <block type="mcu_rtc_get_hour"></block>
+      <block type="mcu_rtc_get_minute"></block>
+      <block type="mcu_rtc_get_second"></block>
+      <block type="mcu_rtc_get_date"></block>
+      <sep gap="10"></sep>
+      <label text="— Set —"></label>
+      <block type="mcu_rtc_set_time"></block>
+    </category>
+
+  </category>
+
+</xml>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODALS
+     ══════════════════════════════════════════════════════════ -->
+
+<!-- Open File Source chooser -->
+<div id="open-source-modal">
+  <div id="open-source-box">
+    <h3>📂 Open File</h3>
+    <button class="open-source-btn" onclick="openFromComputer()">
+      <span class="osb-icon">💻</span>
+      <div><div class="osb-label">Open from Computer</div><div class="osb-desc">Browse local files (.ino .cpp .c .h .txt)</div></div>
+    </button>
+    <button class="open-source-btn" id="open-from-drive-btn" onclick="openFromDrive()">
+      <span class="osb-icon">🟢</span>
+      <div><div class="osb-label">Open from Google Drive</div><div class="osb-desc">Browse your Drive — folders + files</div></div>
+    </button>
+    <button id="open-source-cancel" onclick="closeOpenSourceModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- New File modal -->
+<div id="new-file-modal">
+  <div id="new-file-box">
+    <h3>📄 New Sketch</h3>
+    <p>Unsaved changes will be lost. Enter a name for the new sketch:</p>
+    <input id="new-file-name" type="text" value="sketch" placeholder="sketch name" spellcheck="false"/>
+    <div class="new-file-actions">
+      <button class="btn btn-gray" onclick="closeNewFileModal()">Cancel</button>
+      <button class="btn btn-blue" onclick="confirmNewFile()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save to Drive modal -->
+<div id="save-modal-overlay">
+  <div id="save-modal">
+    <h3>💾 Save to Google Drive</h3>
+    <p>Saves to your <strong style="color:#4ec9b0">omniforma-editor</strong> folder. If the file is read-only, a new copy will be created there.</p>
+    <label>Filename</label>
+    <input id="save-filename-input" type="text" spellcheck="false" placeholder="sketch.ino"/>
+    <div id="save-folder-display">📁 omniforma-editor / <span id="save-folder-name">omniforma-editor</span></div>
+    <div class="save-modal-actions">
+      <button class="btn btn-gray" onclick="closeSaveModal()">Cancel</button>
+      <button class="btn btn-green" onclick="confirmSaveToDrive()">💾 Save to Drive</button>
+    </div>
+  </div>
+</div>
+
+<!-- Google Drive file/folder browser modal -->
+<div id="gdrive-modal-overlay" onclick="gdriveModalClose(event)">
+  <div id="gdrive-modal">
+    <div id="gdrive-modal-header">
+      <div id="gdrive-modal-title">
+        <svg width="16" height="16" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+          <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.7 48.5c-.8 1.35-1.2 2.9-1.2 4.45h27.5z" fill="#00AC47"/>
+          <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.05z" fill="#EA4335"/>
+          <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832D"/>
+          <path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.4 4.5-1.2z" fill="#2684FC"/>
+          <path d="M73.4 26.5l-12.85-22.25C59.75 2.45 58.6 1.35 57.25.55L43.5 24.3 59.8 53h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#FFBA00"/>
+        </svg>
+        Google Drive
+      </div>
+      <button id="gdrive-modal-close" onclick="gdriveModalDismiss()">✕</button>
+    </div>
+    <!-- Breadcrumb -->
+    <div id="gdrive-breadcrumb"></div>
+    <!-- Toolbar -->
+    <div id="gdrive-toolbar">
+      <button class="gdrive-tb-btn" id="gdrive-btn-up" onclick="gdriveNavUp()" title="Go up one level">⬆ Up</button>
+      <button class="gdrive-tb-btn" onclick="gdriveRefresh()" title="Refresh">↺</button>
+      <input id="gdrive-search-input" type="text" placeholder="Search files in current folder…" oninput="gdriveDebouncedSearch(this.value)"/>
+      <button class="gdrive-tb-btn" onclick="gdriveFetchFolder()">🔍</button>
+    </div>
+    <!-- File list -->
+    <div id="gdrive-file-list"></div>
+    <!-- Status -->
+    <div id="gdrive-status-bar">Ready</div>
+    <!-- Footer -->
+    <div id="gdrive-modal-footer">
+      <div id="gdrive-footer-left" id="gdrive-path-display">My Drive</div>
+      <div id="gdrive-footer-right">
+        <button class="btn btn-gray" onclick="gdriveModalDismiss()">Cancel</button>
+        <button class="btn btn-blue" id="gdrive-open-btn" onclick="gdriveOpenSelected()" disabled>Open</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for local open -->
+<input type="file" id="local-file-input" accept=".ino,.cpp,.txt,.c,.h" style="display:none" onchange="localFileSelected(event)"/>
+
+<!-- ── Monaco Editor ──────────────────────────────────────── -->
+
+<!-- Monaco Editor loader (must be before monaco-editor.js) -->
+<script>var require = { paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } };</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.nls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.js"></script>
+
+<!-- Omniforma JS — strict load order required -->
+<script src="js/colours.js"></script>
+<script src="js/blocks-core.js"></script>
+<script src="js/blocks-sensors.js"></script>
+<script src="js/blocks-displays.js"></script>
+<script src="js/blocks-actuators.js"></script>
+<script src="js/serializer.js"></script>
+<script src="js/emitter-micropython.js"></script>
+<script src="js/emitter-cpp.js"></script>
+<script src="js/compiler.js"></script>
+<script src="js/validator.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/examples.js"></script>
+<script src="js/boards.js"></script>
+<script src="js/simulator-core.js"></script>
+<script src="js/simulator-ui.js"></script>
+<script src="js/serial-monitor.js"></script>
+<script src="js/panel-resize.js"></script>
+<script src="js/init.js"></script>
+<script src="js/cloud-compile.js"></script>
+<script src="js/serial-monitor-real.js"></script>
+<script src="js/monaco-editor.js"></script>
+<script src="js/gdrive.js"></script>
+</body>
+</html>
