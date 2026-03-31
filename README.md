@@ -9,7 +9,8 @@ Omniforma Editor V2 is a free, open-source, zero-install web IDE for Arduino dev
 ---
 ## Demos
 
-[V1 Demo](https://3-idiots.github.io/Omniforma-editor/)     [V2 Demo](https://3-idiots.github.io/OmniformaEditorV2/)
+[V1 Demo](https://3-idiots.github.io/Omniforma-editor/)   
+[V2 Demo](https://3-idiots.github.io/OmniformaEditorV2/)
 
 ---
 
