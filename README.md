@@ -72,6 +72,7 @@ Simulate your Arduino sketch directly in the browser without any hardware:
 - Analog wave generator (Sine, Triangle, Square, Sawtooth, Noise)
 - Component detection tab (LCD, Servo, NeoPixel, etc.)
 - Adjustable simulation speed (1x, 2x, 5x, 20x)
+- Basic work best with blocks (only tested for blocks)
 
 ### 📡 Real Serial Monitor
 Connect a physical Arduino over USB using the Web Serial API:
