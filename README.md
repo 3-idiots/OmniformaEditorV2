@@ -32,6 +32,8 @@ V2 is a significant rewrite over [V1](https://github.com/3-idiots/Omniforma-edit
 | **Editor toolbar** | Minimal | Quick-insert snippet buttons (`setup()`, `loop()`, `for`, `if`, `digitalWrite`, `serial`, etc.) |
 | **Panel layout** | Fixed panels | All panels independently **collapsible and drag-resizable** |
 
+Better Vs code inspired UI
+
 ### ☁️ Render Server
 Cloud compile is powered by the Omniforma render server:
 
